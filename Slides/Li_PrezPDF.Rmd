@@ -1,0 +1,120 @@
+---
+author:
+- Frank K. Saforo
+- Chris J. Ezelle
+address: https://github.com/fsaforo1
+title: Predicting Hit Songs
+subtitle: Hot 100 Billboard Chart
+date: \today
+output: binb::metropolis
+---
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(easypackages)
+libraries('data.table', 'testthat', 'gridExtra', 'corrplot', 'GGally', 'reshape','caret',
+          'MASS', 'DT', 'psych', 'ggplot2', 'e1071', 'pdp', 'xgboost', 'htmlwidgets', 'pryr',
+          'dplyr', 'Amelia', 'mice', 'tidyverse', 'RColorBrewer', 'rpart', 'caTools', 'treemap',
+          'AppliedPredictiveModeling', 'rpart.plot', 'randomForest', 'pROC', 'xgboost',
+          'Matrix', 'vcd', 'RANN', 'plyr', 'plotly', 'kableExtra', 'gbm', 'PRROC', 'Ckmeans.1d.dp')
+```
+
+## Overview
+
+
+- Introduction  
+
+
+- The Data and EDA  
+
+
+- Model Building and Evaluation    
+
+
+- Results and Interpretation    
+
+
+- Recommendation and Conclusion
+
+
+
+## Introduction
+
+- Data was extracted from the Spotify API 
+- Get out of bed
+
+
+# The Data
+
+## Collecting the Data
+```{r, out.width = "100%", echo=FALSE, fig.align='center'}
+knitr::include_graphics("./Slides/prz_000.png")
+```
+
+ - **Latest data retrieval was on December 28, 2018**
+
+
+## Data Snap  
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+str(newdata)
+object_size(newdata)
+```
+
+
+
+
+## The Data...   
+
+  - Tempo: Beats Per Minute (BPM) of the song.    
+  - Energy: The energy of a song, the higher the value, the more energetic.     
+  - Danceability: The higher the value, the easier it is to dance to this song.     
+  - Loudness: The higher the value, the louder the song (in dB).    
+  - Valence: The higher the value, the more positive mood for the song.     
+  - Length: The duration of the song.    
+  - Acousticness: The higher the value the more acoustic the song is.      
+  - Release Year: The year each song was released.     
+  - **Popularity (Target Variable)**: The higher the value (on a scale of 0 to 100) the more popular the song is.
+
+**Source:** See features description [here](http://static.echonest.com/SortYourMusic/)
+
+# Exploratory Data Analysis 
+
+## Most Popular Songs of 2018
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "100%", fig.align='center'}
+top5plot
+```
+
+
+## Top 100 Songs by Key   
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "100%", fig.align='center'}
+treemap(ctone2, index="keys", vSize="count", type="index", 
+        palette="Pastel2", title="Top 100 Songs Key charactersics", fontsize.title=12)
+```
+
+## Top 100 Songs by Key  and Emotion
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "100%", fig.align='center'}
+treemap(tone2, index="keylabel", vSize="count", type="index", 
+        palette="Pastel2", title="Top 100 Songs Key charactersics and Emotion", fontsize.title=11)
+```
+
+## Are danceable songs popular?
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "100%", fig.align='center'}
+knitr::include_graphics("./Slides/prz_dance.png")
+```
+
+
+## How does mood affect the popularity of a song?
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "100%", fig.align='center'}
+knitr::include_graphics("./Slides/prz_mood.png")
+```
+
+
+## Energy Vs. Popularity
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "100%", fig.align='center'}
+knitr::include_graphics("./Slides/prz_energy.png")
+```
+

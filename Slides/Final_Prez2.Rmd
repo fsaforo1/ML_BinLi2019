@@ -1,0 +1,465 @@
+---
+title: "Predicting Hit Songs - Hot 100 Billboard Chart"
+author:
+- Frank K. Saforo
+- Chris J. Ezelle
+date: February 22, 2019
+output:
+  slidy_presentation:
+    #incremental: true
+    footer: "F. K. Saforo, C. J. Ezelle, 2/25/2019"
+---  
+
+<style>
+  .col2 {
+    columns: 2 200px;         /* number of columns and width in pixels*/
+    -webkit-columns: 2 200px; /* chrome, safari */
+    -moz-columns: 2 200px;    /* firefox */
+  }
+  .col3 {
+    columns: 3 100px;
+    -webkit-columns: 3 100px;
+    -moz-columns: 3 100px;
+  }
+</style>      
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(easypackages)
+libraries('data.table', 'testthat', 'gridExtra', 'corrplot', 'GGally', 'reshape','caret', 'tidyverse',
+          'MASS', 'DT', 'psych', 'ggplot2', 'e1071', 'pdp', 'xgboost', 'htmlwidgets', 'pryr', 'vip',
+          'dplyr', 'Amelia', 'mice', 'tidyverse', 'RColorBrewer', 'rpart', 'caTools', 'treemap', 'earth',
+          'AppliedPredictiveModeling', 'rpart.plot', 'randomForest', 'pROC', 'xgboost', 'broom',
+          'Matrix', 'vcd', 'RANN', 'plyr', 'plotly', 'kableExtra', 'gbm', 'PRROC', 'Ckmeans.1d.dp')
+```
+
+## Overview
+
+
+- Introduction  
+
+
+- The Data and EDA  
+
+
+- Model Building and Evaluation    
+
+
+- Results and Interpretation    
+
+
+- Recommendation and Conclusion
+
+
+
+## Introduction   
+
+<center>
+```{r, out.width = "60%", echo=FALSE}
+knitr::include_graphics("./Slides/music.jpg")
+```
+</center>  
+
+- Project relevant to musicians and music labels
+
+
+
+## Collecting the Data
+<center>
+```{r, out.width = "60%", echo=FALSE}
+knitr::include_graphics("./Slides/prz_000.png")
+```
+</center>   
+
+ - **Data retrieval up to December 28, 2018**
+
+
+## Data Snap  
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+str(newdata)
+object_size(newdata)
+```
+
+
+
+
+## The Data...   
+
+  - **Tempo**: Beats Per Minute (BPM) of the song.    
+  - **Energy**: The energy of a song, the higher the value, the more energetic.     
+  - **Danceability**: The higher the value, the easier it is to dance to this song.     
+  - **Loudness**: The higher the value, the louder the song (in dB).    
+  - **Valence**: The higher the value, the more positive mood for the song.     
+  - **duration_ms**: The duration of the song.    
+  - **Acousticness**: The higher the value the more acoustic the song is.      
+  - **Popularity (Target Variable)**: The higher the value (on a scale of 0 to 100) the more popular the song is.
+
+**Source:** See features description [here](http://static.echonest.com/SortYourMusic/)
+
+## Which Variables provide the most variation?   
+
+<div class="col2">
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+plotFilterValues(var_imp,feat.type.cols = TRUE)
+corrplot(M, type = "upper")
+```
+</div>  
+
+## How are the 'Top' features related to Popularity
+
+<div class="col2">
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+ggpairs(newdata[sample(1:dim(newdata)[1], 1000), 
+                c("loudness","instrumentalness","duration_ms","danceability","popularity")])
+
+a
+```
+</div>
+
+## Most Popular Songs of 2018
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+top5plot
+```
+
+
+## Top 100 Songs by Key and Emotion   
+
+<div class="col2">  
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "80%", fig.align='center'}
+treemap(ctone2, index="keys", vSize="count", type="index", 
+        palette="Pastel2", title="Top 100 Songs Key charactersics", fontsize.title=12)
+
+treemap(tone2, index="keylabel", vSize="count", type="index", 
+        palette="Pastel2", title="Top 100 Songs Key charactersics and Emotion", fontsize.title=11)
+```
+</div>
+
+
+## How does mood affect the popularity of a song?
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "80%", fig.align='center'}
+knitr::include_graphics("./Slides/prz_mood.png")
+```
+
+
+## Energy Vs. Popularity
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "80%", fig.align='center'}
+knitr::include_graphics("./Slides/prz_energy.png")
+```
+
+## Does the name of the song matter?
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+library(wordcloud)
+wordcloud(newdata$track_name, max.words=100 ,
+          random.order=FALSE,rot.per=0.35,colors=brewer.pal(4, "Dark2"), main="Title")
+```
+
+
+## Model Building and Evaluation
+
+<center>
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "80%", fig.align='center'}
+knitr::include_graphics("./Slides/prz_mod.png")
+```
+</center>
+
+## The Regression Problem 
+
+Popularity is a copntinuous variable that ranges between 0 and 1 
+```{r, echo=FALSE}
+print(paste("Minimum Popularity is", 0.1))
+print(paste("Maximum Popularity is", 0.9))
+```
+
+Models considered:    
+    - Model appropriate for the random component of the response variable; a **GLM with beta random component**.      
+    - A  model that relaxes assumptions of linearity and probability distribution; a nonparametric model **Multivariate Adaptive Regression Splines (MARS)**
+    
+### The Beta Distribution
+Ferrari and Cribari-Neto, 2004 proposed a reparametrization of the **Beta Distribution** , $\mu=p/(p+q)$ and $\phi=p+q$, with the density function being:
+$$f(y \mid \mu,\phi)=\frac{\Gamma(\phi)}{\Gamma(\mu\phi)\Gamma((1-\mu)\phi)}y^{\mu\phi-1}(1-y)^{(1-\mu)\phi-1}, \;\;\; \;\;0<y<1$$
+
+$$E(y)=\mu$$
+and
+$$Var(y)=\frac{\mu(1-\mu)}{1+\phi}$$
+The parameter $\phi$ is known as the precision parameter. Notice that for fixed $\mu$, $\phi$ gets larger and variance of $y$ gets smaller.
+The inverse of $\phi^{-1}$ is also known as the dispersion parameter.   
+
+This parameterization is particularly useful in linear regression since it involves modeling the mean or the expected value of the response variable$(y)$. Thus $\mu$ is the mean of the response variable.  
+  
+## The Beta [GLM] Model  
+
+Following the latter parameterization of the beta distribution proposed by Ferrari and Cribari-Neto(2004) above, let $y_1, y_2, ...,y_n$ be a random sample such that $y_i \sim Beta(\mu_i,\phi)\;\;\;\;i=1,2,...,n$. Then the beta regression model is defined as:   
+
+$$g(\mu_i)=x_i^T\beta$$  
+where $\beta=(\beta_1, \beta_2,...,\beta_p)$ is a $p\times1$ vector of unknown parameters$(p<n), \;\;x_i=(x_{i1},(x_{i},...,(x_{ip})^T$ is the vector of $p$ regressors or the independent variables of this model. $x_i^T\beta=\eta_i$ is the linear predictor or the systematic component of the model.   
+
+
+Due the the link, random (beta distribution) and systematic component (linear predictor), the beta regression model can be modelled seen as a Generalized Linear Model (GLM) (Agresti et al. Categroical Data Analysis). This offers flexibility in the choice of the link function to suit particular cases.  Some common link functions are:
+
+
+### Some Common Link functions
+
+ - **logit** $g(\mu) = log(\frac{\mu}{1-\mu})$, thus $\mu=\frac{e^{x_i^T\beta}}{1+e^{x_i^T\beta}}$
+ - **log-log** $g(\mu) = log(-log(\mu))$
+ - **Probit** $g(\mu) = \phi^{-1}(\mu)$
+ - **Complimentary log-log** $g(\mu) = log(-log(1-\mu))$
+ - **Cauchit** $g(\mu) = tan(\pi (\mu - 0.5))$   
+ - **Identity** $g(\mu) = \mu$
+
+Like with most GLM, the inverse function $\mu=g^{-1}(x_i^T\beta)$, is a function (linear combination) of the regression parameters $\beta$, hence the maximum likelihood estimation is adopted.
+
+
+
+## The Classification Problem
+This problem is a classic case of class imbalance with the class of interest being roughly 10 percent of available data.  
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+prop.table(table(modData$target))
+```
+
+A rather simple criteria was adopted. Fit models that:  
+
+  1. produces the best prediction of classes, and with a variable selection feature   
+  
+  2. produces the best prediction, and with the best variable explanation
+  
+Models that meet criteria 1: Models that employ Gradient Boosting Algorithms OR Bagging Algorithms.
+  Due to serious computational constraints only the **XGBoost** model was considered with optimal parameter tuning.   
+  
+Models that meet criteria 2:   Models that employ Stacking or Bagging algorithms. Here, only the **logistic regression and random forest models** were considered.
+
+
+## Model Building - Beta Regression Model 
+
+  - First conduct feature selection using the Recursive Feature Elimination (RFE) algorithm        
+  
+  - Cross-validate model accross a combination of its tuning parameters using selected variables from the RFE: **the link function**, **parameter estimation criteria**, and the **precision parameter**
+
+
+### Recursive Feature Elimination 
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+RFE$results[, -c(3,6)]
+
+varImp(RFE)
+
+```
+
+## The Beta Model   
+
+**Tuning Parameters of Beta Model**
+```{r, warning=FALSE, message=FALSE}
+betamod
+```
+
+### Final model and Train, Test Error
+
+```{r, warning=FALSE, message=FALSE}
+betamod$finalModel
+
+# Train RMSE
+RMSE(TRAIN$popularity, predict(betamod))
+
+# Test RMSE
+RMSE(TEST$popularity, predict(betamod, newdata = TEST))
+```
+
+
+## Multivariate Adaptive Regression Splines (MARS) Model  
+
+  - a piecewise linear model that captures the nonlinearity aspect of polynomial regression by assessing cutpoints (knots) similar to step functions.    
+  - Cross-validate to tune model complexity by pruning for an optimal combination of model hyperparameters    
+  - **Pruning Parameters**: **degree of interactions** and the **number of retained terms**
+
+### 10-Fold Cross Validation 
+
+```{r, warning=FALSE, message=FALSE}
+MARS_model$finalModel
+
+# best model
+MARS_model$bestTune
+```
+
+```{r, warning=FALSE, message=FALSE, fig.align='center'}
+# plot results
+ggplot(MARS_model)
+```
+
+## MARS Model Analysis
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Coefficients of the model
+coef(MARS_model$finalModel)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.align='center'}
+# variable importance plots
+k1 <- vip(MARS_model, num_features = 40, bar = FALSE, value = "gcv") + ggtitle("GCV")
+k2 <- vip(MARS_model, num_features = 40, bar = FALSE, value = "rss") + ggtitle("RSS")
+
+gridExtra::grid.arrange(k1, k2, ncol = 2)
+```
+
+### Test and Train Set Diagnostics
+```{r, warning=FALSE, message=FALSE}
+# TRAIN RMSE
+RMSE(TRAIN$popularity, predict(MARS_model))
+
+# TEST MSE
+RMSE(TEST$popularity, predict(MARS_model, newdata = TEST))
+```
+
+## Comparing the Regression Models
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+Model <- c("Beta Regression", "MARS Model")
+Test_RMSE <- c(RMSE(TEST$popularity, predict(betamod, newdata = TEST)),
+               RMSE(TEST$popularity, predict(MARS_model, newdata = TEST)))
+
+Train_RMSE <- c(RMSE(TRAIN$popularity, predict(betamod)),
+               RMSE(TRAIN$popularity, predict(MARS_model)))
+data.frame(Model, Train_RMSE, Test_RMSE)
+```
+
+
+### Variable Importance  - Beta Vs. MARS 
+
+<div class="col2">  
+```{r, warning=FALSE, message=FALSE, echo=FALSE, out.width="80%"}
+knitr::include_graphics("./Slides/betaimp.png")
+k2
+```
+</div>
+
+
+## The Imbalanced Classification Challenge 
+
+Four sampling schemes were adopted - Weighted, Under, Over and SMOTE (Synthetic Minority Over-sampling Technique).      
+
+Gradient Boosting Machines and Random Forests were tuned and using all four resampling schemes.
+
+
+Below is the outline of the simple strategy:   
+
+  1. Build a base classifier (XGBoost and Random Forest) without any resampling technique;  
+  
+  2. Build 4 other classifiers (XGBoost and Random Forest) with the same    
+  
+
+## Tuning the Extreme Gradient Machine  
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+gg1 <- tuneplot(xgb_tune) + ggtitle('1. Number of Iterations and Learning Rate')+ 
+  scale_fill_continuous(guide = guide_legend()) +
+    theme(legend.position="bottom")
+
+gg2 <- tuneplot(xgb_tune2) + ggtitle('2. Maximum Depth and Minimum Child Weight')+ 
+  scale_fill_continuous(guide = guide_legend()) +
+    theme(legend.position="bottom")
+gg3 <- tuneplot(xgb_tune3) + ggtitle('3. Column and Row Sampling')+ 
+  scale_fill_continuous(guide = guide_legend()) +
+    theme(legend.position="bottom")
+gg4 <- tuneplot(xgb_tune4) + ggtitle('4. Tuning Gamma')+ 
+  scale_fill_continuous(guide = guide_legend()) +
+    theme(legend.position="bottom")
+gg5 <- tuneplot(xgb_tune5) + ggtitle('5. Reducing the Learning Rate')
+
+grid.arrange(gg1, gg2, ncol=2)
+grid.arrange(gg3, gg4, ncol=2)
+gg5
+```
+
+
+
+
+## Final Models - The Random Forest Models Test Set Diagnostics
+```{r}
+## Train AUC
+RF_TRAIN_roc %>%map(auc)
+
+## Test AUC
+RF_TEST_roc %>%map(auc)
+```
+
+## Final Models - The XGBoost Models Test Set Diagnostics
+
+```{r}
+default_XGB$evaluation_log
+default_XGB$evaluation_log[
+  default_XGB$evaluation_log$cv_auc==max(default_XGB$evaluation_log$cv_auc),]  
+```  
+
+```{r, fig.align='center'}
+xgb.ggplot.importance(default_XGB_Importance)
+```
+
+```{r}
+SMOTE_XGB$bestTune
+```  
+
+```{r, fig.align='center'}
+plot(varImp(SMOTE_XGB))
+```  
+
+## Final Models - The XGBoost Models Test Set Diagnostics...
+```{r}
+## Train AUC
+XGB_TRAIN_roc %>%map(auc)
+
+## Test AUC
+XGB_TEST_roc %>%map(auc)
+```
+
+## Conclusion  
+
+- Solutions to the regression problem provided similar accuracies.   
+- The Beta model, like most GLM models has additional features like hypothesis testing which makes it more valuable for scientific inferences.     
+- MARS model, automatically models nonlinearities and it is very easy to explain.  
+
+- The SMOTE resampling techniques improved model accuracy for both the XGBoost and Random Forest Models
+
+- For the purposes of prediction, the SMOTE-resampled XGBoost model is recommended.     
+
+- For all the models, loudness was distinctively the most important variable. We believe this to be a proxy of song quality, hence we recommend high quality songs.      
+
+- **Instrumentalness, Energy and Danceability** were equally dominant in all models
+
+- In terms of prediction accuracy, the models, although useful,  did not perform any better than random noise even with the resampling and ensembling techniques adopted.  
+
+- Further research can explore other features like lyrics, brand name, advertising and other text-related information 
+
+
+
+## Big PICTURE    
+
+- **Collaborative Filtering**: Historical and/or Content-based recommendation   
+
+- Predicting listening preferences   
+
+
+## Big PICTURE..
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "80%", fig.align='center'}
+knitr::include_graphics("./Slides/danceplot.png")
+```
+
+## Big PICTURE...
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, out.width = "60%", fig.align='center'}
+knitr::include_graphics("./Slides/valenceplot.png")
+```
+
+
+## Resources and References 
+
+   - [Introduction to Boosted Treees Site](https://xgboost.readthedocs.io/en/latest/tutorials/model.html)   
+   - [GPU Computing in R](http://www.r-tutor.com/gpu-computing)   
+   - [Spotify API](https://developer.spotify.com/documentation/web-api/)    
+   - [Million Song Dataset Archive](https://labrosa.ee.columbia.edu/millionsong/)   
+   - [Spotify API Wrapper for R and some codes](https://www.rcharlie.com/spotifyr/)    
+   - [Cribari-Neto, Zeileis, 'Beta Regression in R'](https://cran.r-project.org/web/packages/betareg/vignettes/betareg.pdf)   
+   - [Hastie et. al, 'Introduction to Statistical Learning'](http://www-bcf.usc.edu/~gareth/ISL/)   
+   - [The Caret Package and Tutorial](https://topepo.github.io/caret/model-training-and-tuning.html)   
+   - Pham, J., Kyauk, E. & Park, E. (2016), 'Predicting song popularity',nd):n. pag. Web26  
+   - A. Agresti, 'Categrorical Data Analysis'
