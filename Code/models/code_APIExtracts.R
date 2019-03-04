@@ -1,12 +1,12 @@
-Sys.setenv(SPOTIFY_CLIENT_ID = 'db9cfbe1f69f45d1a4bd641463a6c09e')
-Sys.setenv(SPOTIFY_CLIENT_SECRET = 'cf422bc7e56a4d82a075c2ad60aa9672')
+Sys.setenv(SPOTIFY_CLIENT_ID = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+Sys.setenv(SPOTIFY_CLIENT_SECRET = 'xxxxxxxxxxxxxxxxxxxxxxxxx')
 access_token <- get_spotify_access_token()
 
 spotify_df <- get_artist_audio_features('Bruno')
 
 str(spotify_df)
 
-token <- '3YxcxGs0Y-acFzCzoJi8LeK8HeKRbW7yk54qVeLhUh7YktgxDrFf5Vvgk-YfbNJm'
+token <- 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 
 library(httr)
 genius_get_artists <- function(artist_name, n_results = 10) {
