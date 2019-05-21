@@ -1,5 +1,5 @@
 function(request) {
-    material_page(title = HTML('<span>Sentify</span> <span style="font-size:12px"><a href="http://www.rcharlie.com" target="_blank">by RCharlie</a></span>'),
+    material_page(title = HTML('<span>Sentify</span> <span style="font-size:12px"><a href="PUT_WEN_ADDRESS_HERE" target="_blank">by RCharlie</a></span>'),
                   nav_bar_color = 'black',
                   font_color = 'white',
                   background_color = '#828282',
